@@ -263,6 +263,22 @@ static inline unsigned int pulp_cl_idma_memcpy(unsigned int const dst_addr, unsi
 #endif // ARCHI_HAS_DMA_DEMUX
 }
 
+static inline unsigned int pulp_idma_memcpy_2d(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps) {
+  DMA_WRITE(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
+  DMA_WRITE(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
+  DMA_WRITE(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
+  DMA_WRITE(1<<PULPOPEN_IDMA_CONF_TWOD_BIT, PULPOPEN_IDMA_CONF_REG_OFFSET);
+  DMA_WRITE(src_stride, PULPOPEN_IDMA_STRIDE_SRC_REG_OFFSET);
+  DMA_WRITE(dst_stride, PULPOPEN_IDMA_STRIDE_DST_REG_OFFSET);
+  DMA_WRITE(num_reps, PULPOPEN_IDMA_NUM_REPETITIONS_REG_OFFSET);
+  asm volatile("" : : : "memory");
+
+  // Launch TX
+  unsigned int dma_tx_id = DMA_READ(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
+
+  return dma_tx_id;
+}
+
 static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize) {
   DMA_WRITE(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
   DMA_WRITE(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
