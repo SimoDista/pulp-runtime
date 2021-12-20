@@ -100,6 +100,18 @@ static inline int plp_dma_l1ToExt_irq(dma_ext_t ext, unsigned int loc, unsigned 
   */
 static inline int plp_dma_extToL1_irq(unsigned int loc, dma_ext_t ext, unsigned short size);
 
+/** 2-dimensional memory transfer with event-based completion. 
+ * 
+  \param   ext    Address in the external memory where to access the data. There is no restriction on memory alignment.
+  \param   loc    Address in the cluster memory where to access the data. There is no restriction on memory alignment.
+  \param   size   Number of bytes to be transfered. The only restriction is that this size must fit 16 bits, i.e. must be inferior to 65536.
+  \param   stride 2D stride, which is the number of bytes which are added to the beginning of the current line to switch to the next one. Must fit 16 bits, i.e. must be inferior to 65536.
+  \param   length 2D length, which is the number of transfered bytes after which the DMA will switch to the next line. Must fit 16 bits, i.e. must be inferior to 65536.
+  \param   ext2loc If 1, the transfer is loading data from external memory and storing to cluster memory. If 0, it is the contrary
+  \return         The identifier of the transfer. This can be used with plp_dma_wait to wait for the completion of this transfer.
+  */
+static inline int plp_dma_memcpy_2d(dma_ext_t ext, unsigned int loc, unsigned int size, unsigned int stride, unsigned int length, int ext2loc);
+
 //!@}
 
 /** @name DMA wait functions
@@ -157,6 +169,21 @@ static inline unsigned int pulp_idma_tx_cplt(unsigned int dma_tx_id);
   \return            The dma transfer identifier
   */
 static inline unsigned int pulp_idma_memcpy(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes);
+
+/**
+ * iDMA 2D memory transfer
+ * Launches a standard 2D memory transfer
+ *
+  \param  dst_addr   The destination address
+  \param  src_addr   The source address
+  \param  num_bytes  The number bytes (per stride)
+  \param  src_stride The stride at the source
+  \param  dst_stride The stride at the destination
+  \param  num_reps   The number of repetitions
+  \return            The dma transfer identifier
+  */
+static inline unsigned int pulp_idma_memcpy_2d(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps);
+
 
 /**
  * iDMA advanced memory transfer
@@ -399,6 +426,14 @@ static inline int plp_dma_extToL1_irq(unsigned int loc, dma_ext_t ext, unsigned 
 
 static inline int plp_cl_dma_extToL1_irq(unsigned int loc, dma_ext_t ext, unsigned short size) {
   return pulp_cl_idma_memcpy(loc, ext, size);
+}
+
+static inline int plp_dma_memcpy_2d(dma_ext_t ext, unsigned int loc, unsigned int size, unsigned int stride, unsigned int length, int ext2loc) {
+  if (ext2loc) {
+    return pulp_idma_memcpy_2d(loc, ext, length, length, stride, size/length);
+  } else {
+    return pulp_idma_memcpy_2d(ext, loc, length, stride, length, size/length);
+  }
 }
 
 static inline void plp_dma_barrier() {
