@@ -23,9 +23,8 @@
 #define PLP_DMA_LOC2EXT 0
 #define PLP_DMA_EXT2LOC 1
 
-// 2D not yet supported
 #define PLP_DMA_1D 0
-// #define PLP_DMA_2D 1
+#define PLP_DMA_2D 1
 
 #define DMA_MAX_NUM_STREAMS 4
 #define IDMA_EVENT 8 // all iDMA tx_cplt events are broadcast
@@ -208,11 +207,11 @@ static inline unsigned int plp_dma_status();
 static inline unsigned int pulp_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize) {
   unsigned int conf;
 #if defined(__riscv__)
-  conf = __builtin_bitinsert(0,    decouple,  1, CLUSTER_DMA_FRONTEND_CONF_DECOUPLE_BIT);
-  conf = __builtin_bitinsert(conf, deburst,   1, CLUSTER_DMA_FRONTEND_CONF_DEBURST_BIT);
-  conf = __builtin_bitinsert(conf, serialize, 1, CLUSTER_DMA_FRONTEND_CONF_SERIALIZE_BIT);
+  conf = __builtin_bitinsert(0,    decouple,  1, PULPOPEN_IDMA_CONF_DECOUPLE_BIT);
+  conf = __builtin_bitinsert(conf, deburst,   1, PULPOPEN_IDMA_CONF_DEBURST_BIT);
+  conf = __builtin_bitinsert(conf, serialize, 1, PULPOPEN_IDMA_CONF_SERIALIZE_BIT);
 #else
-  conf = (((decouple & 0x1)<<CLUSTER_DMA_FRONTEND_CONF_DECOUPLE_BIT) | ((deburst & 0x1)<<CLUSTER_DMA_FRONTEND_CONF_DEBURST_BIT) | ((serialize & 0x1)<<CLUSTER_DMA_FRONTEND_CONF_SERIALIZE_BIT));
+  conf = (((decouple & 0x1)<<PULPOPEN_IDMA_CONF_DECOUPLE_BIT) | ((deburst & 0x1)<<PULPOPEN_IDMA_CONF_DEBURST_BIT) | ((serialize & 0x1)<<PULPOPEN_IDMA_CONF_SERIALIZE_BIT));
 #endif
   return conf;
 }
@@ -222,12 +221,12 @@ static inline unsigned int pulp_cl_idma_get_conf(unsigned int decouple, unsigned
 }
 
 static inline unsigned int pulp_idma_tx_cplt(unsigned int dma_tx_id) {
-  return (dma_tx_id & 0x0fffffff) <= DMA_READ(CLUSTER_DMA_FRONTEND_DONE_REG_OFFSET + ((dma_tx_id & 0xf0000000) >> 26));
+  return (dma_tx_id & 0x0fffffff) <= DMA_READ(PULPOPEN_IDMA_DONE_REG_OFFSET + ((dma_tx_id & 0xf0000000) >> 26));
 }
 
 static inline unsigned int pulp_cl_idma_tx_cplt(unsigned int dma_tx_id) {
 #ifdef ARCHI_HAS_DMA_DEMUX
-  return (dma_tx_id & 0x0fffffff) <= DMA_READ(CLUSTER_DMA_FRONTEND_DONE_REG_OFFSET + ((dma_tx_id & 0xf0000000) >> 26));
+  return (dma_tx_id & 0x0fffffff) <= DMA_READ(PULPOPEN_IDMA_DONE_REG_OFFSET + ((dma_tx_id & 0xf0000000) >> 26));
 #else // ARCHI_HAS_DMA_DEMUX
   return pulp_idma_tx_cplt(dma_tx_id);
 #endif // ARCHI_HAS_DMA_DEMUX
@@ -235,28 +234,28 @@ static inline unsigned int pulp_cl_idma_tx_cplt(unsigned int dma_tx_id) {
 
 
 static inline unsigned int pulp_idma_memcpy(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes) {
-  DMA_WRITE(src_addr, CLUSTER_DMA_FRONTEND_SRC_ADDR_REG_OFFSET);
-  DMA_WRITE(dst_addr, CLUSTER_DMA_FRONTEND_DST_ADDR_REG_OFFSET);
-  DMA_WRITE(num_bytes, CLUSTER_DMA_FRONTEND_NUM_BYTES_REG_OFFSET);
-  DMA_WRITE(0, CLUSTER_DMA_FRONTEND_CONF_REG_OFFSET);
+  DMA_WRITE(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
+  DMA_WRITE(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
+  DMA_WRITE(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
+  DMA_WRITE(0, PULPOPEN_IDMA_CONF_REG_OFFSET);
   asm volatile("" : : : "memory");
 
   // Launch TX
-  unsigned int dma_tx_id = DMA_READ(CLUSTER_DMA_FRONTEND_NEXT_ID_REG_OFFSET);
+  unsigned int dma_tx_id = DMA_READ(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
 
   return dma_tx_id;
 }
 
 static inline unsigned int pulp_cl_idma_memcpy(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes) {
 #ifdef ARCHI_HAS_DMA_DEMUX
-  DMA_WRITE_DEMUX(src_addr, CLUSTER_DMA_FRONTEND_SRC_ADDR_REG_OFFSET);
-  DMA_WRITE_DEMUX(dst_addr, CLUSTER_DMA_FRONTEND_DST_ADDR_REG_OFFSET);
-  DMA_WRITE_DEMUX(num_bytes, CLUSTER_DMA_FRONTEND_NUM_BYTES_REG_OFFSET);
-  DMA_WRITE_DEMUX(0, CLUSTER_DMA_FRONTEND_CONF_REG_OFFSET);
+  DMA_WRITE_DEMUX(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
+  DMA_WRITE_DEMUX(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
+  DMA_WRITE_DEMUX(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
+  DMA_WRITE_DEMUX(0, PULPOPEN_IDMA_CONF_REG_OFFSET);
   asm volatile("" : : : "memory");
 
   // Launch TX
-  unsigned int dma_tx_id = DMA_READ_DEMUX(CLUSTER_DMA_FRONTEND_NEXT_ID_REG_OFFSET);
+  unsigned int dma_tx_id = DMA_READ_DEMUX(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
 
   return dma_tx_id;
 #else // ARCHI_HAS_DMA_DEMUX
@@ -265,30 +264,30 @@ static inline unsigned int pulp_cl_idma_memcpy(unsigned int const dst_addr, unsi
 }
 
 static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize) {
-  DMA_WRITE(src_addr, CLUSTER_DMA_FRONTEND_SRC_ADDR_REG_OFFSET);
-  DMA_WRITE(dst_addr, CLUSTER_DMA_FRONTEND_DST_ADDR_REG_OFFSET);
-  DMA_WRITE(num_bytes, CLUSTER_DMA_FRONTEND_NUM_BYTES_REG_OFFSET);
+  DMA_WRITE(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
+  DMA_WRITE(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
+  DMA_WRITE(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
   unsigned int conf = pulp_idma_get_conf(decouple, deburst, serialize);
-  DMA_WRITE(conf, CLUSTER_DMA_FRONTEND_CONF_REG_OFFSET);
+  DMA_WRITE(conf, PULPOPEN_IDMA_CONF_REG_OFFSET);
   asm volatile("" : : : "memory");
 
   // Launch TX
-  unsigned int dma_tx_id = DMA_READ(CLUSTER_DMA_FRONTEND_NEXT_ID_REG_OFFSET);
+  unsigned int dma_tx_id = DMA_READ(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
 
   return dma_tx_id;
 }
 
 static inline unsigned int pulp_cl_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize) {
 #ifdef ARCHI_HAS_DMA_DEMUX
-  DMA_WRITE_DEMUX(src_addr, CLUSTER_DMA_FRONTEND_SRC_ADDR_REG_OFFSET);
-  DMA_WRITE_DEMUX(dst_addr, CLUSTER_DMA_FRONTEND_DST_ADDR_REG_OFFSET);
-  DMA_WRITE_DEMUX(num_bytes, CLUSTER_DMA_FRONTEND_NUM_BYTES_REG_OFFSET);
+  DMA_WRITE_DEMUX(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
+  DMA_WRITE_DEMUX(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
+  DMA_WRITE_DEMUX(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
   unsigned int conf = pulp_cl_idma_get_conf(decouple, deburst, serialize);
-  DMA_WRITE_DEMUX(conf, CLUSTER_DMA_FRONTEND_CONF_REG_OFFSET);
+  DMA_WRITE_DEMUX(conf, PULPOPEN_IDMA_CONF_REG_OFFSET);
   asm volatile("" : : : "memory");
 
   // Launch TX
-  unsigned int dma_tx_id = DMA_READ_DEMUX(CLUSTER_DMA_FRONTEND_NEXT_ID_REG_OFFSET);
+  unsigned int dma_tx_id = DMA_READ_DEMUX(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
 
   return dma_tx_id;
 #else // ARCHI_HAS_DMA_DEMUX
@@ -297,12 +296,12 @@ static inline unsigned int pulp_cl_idma_memcpy_advanced(unsigned int const dst_a
 }
 
 static inline unsigned int plp_dma_status() {
-  return DMA_READ(CLUSTER_DMA_FRONTEND_STATUS_REG_OFFSET);
+  return DMA_READ(PULPOPEN_IDMA_STATUS_REG_OFFSET);
 }
 
 static inline unsigned int plp_cl_dma_status() {
 #ifdef ARCHI_HAS_DMA_DEMUX
-  return DMA_READ_DEMUX(CLUSTER_DMA_FRONTEND_STATUS_REG_OFFSET);
+  return DMA_READ_DEMUX(PULPOPEN_IDMA_STATUS_REG_OFFSET);
 #else // ARCHI_HAS_DMA_DEMUX
   return plp_dma_status();
 #endif // ARCHI_HAS_DMA_DEMUX
