@@ -112,6 +112,28 @@ static inline int plp_dma_extToL1_irq(unsigned int loc, dma_ext_t ext, unsigned 
   */
 static inline int plp_dma_memcpy_2d(dma_ext_t ext, unsigned int loc, unsigned int size, unsigned int stride, unsigned int length, int ext2loc);
 
+/** Cluster memory to external memory 2-dimensional transfer with event-based completion. 
+ * 
+  \param   ext    Address in the external memory where to store the data. There is no restriction on memory alignment.
+  \param   loc    Address in the cluster memory where to load the data. There is no restriction on memory alignment.
+  \param   size   Number of bytes to be transfered. The only restriction is that this size must fit 16 bits, i.e. must be inferior to 65536.
+  \param   stride 2D stride, which is the number of bytes which are added to the beginning of the current line to switch to the next one. Must fit 16 bits, i.e. must be inferior to 65536. This applies only to the external memory.
+  \param   length 2D length, which is the number of transfered bytes after which the DMA will switch to the next line. Must fit 16 bits, i.e. must be inferior to 65536. This applies only to the external memory.
+  \return         The identifier of the transfer. This can be used with plp_dma_wait to wait for the completion of this transfer.
+  */
+static inline int plp_dma_l1ToExt_2d(dma_ext_t ext, unsigned int loc, unsigned short size, unsigned short stride, unsigned short length);
+
+/** External memory to cluster memory 2-dimensional transfer with event-based completion. 
+ * 
+  \param   loc    Address in the cluster memory where to store the data. There is no restriction on memory alignment.
+  \param   ext    Address in the external memory where to load the data. There is no restriction on memory alignment.
+  \param   size   Number of bytes to be transfered. The only restriction is that this size must fit 16 bits, i.e. must be inferior to 65536.
+  \param   stride 2D stride, which is the number of bytes which are added to the beginning of the current line to switch to the next one. Must fit 16 bits, i.e. must be inferior to 65536. This applies only to the external memory.
+  \param   length 2D length, which is the number of transfered bytes after which the DMA will switch to the next line. Must fit 16 bits, i.e. must be inferior to 65536. This applies only to the external memory.
+  \return         The identifier of the transfer. This can be used with plp_dma_wait to wait for the completion of this transfer
+  */
+static inline int plp_dma_extToL1_2d(unsigned int loc, dma_ext_t ext, unsigned short size, unsigned short stride, unsigned short length);
+
 //!@}
 
 /** @name DMA wait functions
@@ -298,11 +320,27 @@ static inline unsigned int pulp_idma_memcpy_2d(unsigned int const dst_addr, unsi
   DMA_WRITE(1<<PULPOPEN_IDMA_CONF_TWOD_BIT, PULPOPEN_IDMA_CONF_REG_OFFSET);
   DMA_WRITE(src_stride, PULPOPEN_IDMA_STRIDE_SRC_REG_OFFSET);
   DMA_WRITE(dst_stride, PULPOPEN_IDMA_STRIDE_DST_REG_OFFSET);
-  DMA_WRITE(num_reps, PULPOPEN_IDMA_NUM_REPETITIONS_REG_OFFSET);
+  DMA_WRITE(num_reps,   PULPOPEN_IDMA_NUM_REPETITIONS_REG_OFFSET);
   asm volatile("" : : : "memory");
 
   // Launch TX
   unsigned int dma_tx_id = DMA_READ(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
+
+  return dma_tx_id;
+}
+
+static inline unsigned int pulp_cl_idma_memcpy_2d(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps) {
+  DMA_WRITE_DEMUX(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
+  DMA_WRITE_DEMUX(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
+  DMA_WRITE_DEMUX(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
+  DMA_WRITE_DEMUX(1<<PULPOPEN_IDMA_CONF_TWOD_BIT, PULPOPEN_IDMA_CONF_REG_OFFSET);
+  DMA_WRITE_DEMUX(src_stride, PULPOPEN_IDMA_STRIDE_SRC_REG_OFFSET);
+  DMA_WRITE_DEMUX(dst_stride, PULPOPEN_IDMA_STRIDE_DST_REG_OFFSET);
+  DMA_WRITE_DEMUX(num_reps,   PULPOPEN_IDMA_NUM_REPETITIONS_REG_OFFSET);
+  asm volatile("" : : : "memory");
+
+  // Launch TX
+  unsigned int dma_tx_id = DMA_READ_DEMUX(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
 
   return dma_tx_id;
 }
@@ -445,6 +483,30 @@ static inline int plp_dma_memcpy_2d(dma_ext_t ext, unsigned int loc, unsigned in
   } else {
     return pulp_idma_memcpy_2d(ext, loc, length, stride, length, size/length);
   }
+}
+
+static inline int plp_cl_dma_memcpy_2d(dma_ext_t ext, unsigned int loc, unsigned int size, unsigned int stride, unsigned int length, int ext2loc) {
+  if (ext2loc) {
+    return pulp_cl_idma_memcpy_2d(loc, ext, length, length, stride, size/length);
+  } else {
+    return pulp_cl_idma_memcpy_2d(ext, loc, length, stride, length, size/length);
+  }
+}
+
+static inline int plp_dma_l1ToExt_2d(dma_ext_t ext, unsigned int loc, unsigned short size, unsigned short stride, unsigned short length) {
+    return pulp_idma_memcpy_2d(ext, loc, length, stride, length, size/length);
+}
+
+static inline int plp_cl_dma_l1ToExt_2d(dma_ext_t ext, unsigned int loc, unsigned short size, unsigned short stride, unsigned short length) {
+    return pulp_cl_idma_memcpy_2d(ext, loc, length, stride, length, size/length);
+}
+
+static inline int plp_dma_extToL1_2d(unsigned int loc, dma_ext_t ext, unsigned short size, unsigned short stride, unsigned short length) {
+    return pulp_idma_memcpy_2d(loc, ext, length, length, stride, size/length);
+}
+
+static inline int plp_cl_dma_extToL1_2d(unsigned int loc, dma_ext_t ext, unsigned short size, unsigned short stride, unsigned short length) {
+    return pulp_cl_idma_memcpy_2d(loc, ext, length, length, stride, size/length);
 }
 
 static inline void plp_dma_barrier() {
