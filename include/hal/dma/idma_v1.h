@@ -72,34 +72,6 @@ static inline int plp_dma_l1ToExt(dma_ext_t ext, unsigned int loc, unsigned shor
   */
 static inline int plp_dma_extToL1(unsigned int loc, dma_ext_t ext, unsigned short size);
 
-/** Memory transfer with irq-based completion. 
- * 
-  \param   ext     Address in the external memory where to access the data. There is no restriction on memory alignment.
-  \param   loc     Address in the cluster memory where to access the data. There is no restriction on memory alignment.
-  \param   size    Number of bytes to be transfered. The only restriction is that this size must fit 16 bits, i.e. must be inferior to 65536.
-  \param   ext2loc If 1, the transfer is loading data from external memory and storing to cluster memory. If 0, it is the contrary
-  \return          The identifier of the transfer. This can be used with plp_dma_wait to wait for the completion of this transfer.
-  */
-static inline int plp_dma_memcpy_irq(dma_ext_t ext, unsigned int loc, unsigned short size, int ext2loc);
-
-/** Cluster memory to external memory transfer with irq-based completion. 
- * 
-  \param   ext  Address in the external memory where to store the data. There is no restriction on memory alignment.
-  \param   loc  Address in the cluster memory where to load the data. There is no restriction on memory alignment.
-  \param   size Number of bytes to be transfered. The only restriction is that this size must fit 16 bits, i.e. must be inferior to 65536.
-  \return       The identifier of the transfer. This can be used with plp_dma_wait to wait for the completion of this transfer.
-  */
-static inline int plp_dma_l1ToExt_irq(dma_ext_t ext, unsigned int loc, unsigned short size);
-
-/** External memory to cluster memory transfer with irq-based completion. 
- * 
-  \param   loc  Address in the cluster memory where to store the data. There is no restriction on memory alignment.
-  \param   ext  Address in the external memory where to load the data. There is no restriction on memory alignment.
-  \param   size Number of bytes to be transfered. The only restriction is that this size must fit 16 bits, i.e. must be inferior to 65536.
-  \return       The identifier of the transfer. This can be used with plp_dma_wait to wait for the completion of this transfer.
-  */
-static inline int plp_dma_extToL1_irq(unsigned int loc, dma_ext_t ext, unsigned short size);
-
 /** 2-dimensional memory transfer with event-based completion. 
  * 
   \param   ext    Address in the external memory where to access the data. There is no restriction on memory alignment.
@@ -442,38 +414,6 @@ static inline int plp_dma_extToL1(unsigned int loc, dma_ext_t ext, unsigned shor
 }
 
 static inline int plp_cl_dma_extToL1(unsigned int loc, dma_ext_t ext, unsigned short size) {
-  return pulp_cl_idma_memcpy(loc, ext, size);
-}
-
-static inline int plp_dma_memcpy_irq(dma_ext_t ext, unsigned int loc, unsigned short size, int ext2loc) {
-  if (ext2loc) {
-    return pulp_idma_memcpy(loc, ext, size);
-  } else {
-    return pulp_idma_memcpy(ext, loc, size);
-  }
-}
-
-static inline int plp_cl_dma_memcpy_irq(dma_ext_t ext, unsigned int loc, unsigned short size, int ext2loc) {
-  if (ext2loc) {
-    return pulp_cl_idma_memcpy(loc, ext, size);
-  } else {
-    return pulp_cl_idma_memcpy(ext, loc, size);
-  }
-}
-
-static inline int plp_dma_l1ToExt_irq(dma_ext_t ext, unsigned int loc, unsigned short size) {
-  return pulp_idma_memcpy(ext, loc, size);
-}
-
-static inline int plp_cl_dma_l1ToExt_irq(dma_ext_t ext, unsigned int loc, unsigned short size) {
-  return pulp_cl_idma_memcpy(ext, loc, size);
-}
-
-static inline int plp_dma_extToL1_irq(unsigned int loc, dma_ext_t ext, unsigned short size) {
-  return pulp_idma_memcpy(loc, ext, size);
-}
-
-static inline int plp_cl_dma_extToL1_irq(unsigned int loc, dma_ext_t ext, unsigned short size) {
   return pulp_cl_idma_memcpy(loc, ext, size);
 }
 
