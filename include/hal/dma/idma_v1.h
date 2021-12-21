@@ -34,13 +34,12 @@ typedef unsigned int dma_loc_t;
 
 /** @name High-level DMA memory copy functions
  * The following functions can be used to trigger DMA transfers to copy data between the cluster memory (L1) and another memory outside the cluster (another cluster L1 or L2).
- * Note that they cannot be used from L2 to L2 or from a cluster memory to the same cluster memory. The DMA supports the following features:
- *   - Transfers can be either event-based or irq-based. With event-based transfers the core can call a wait function to block execution until the transfer is done. With irq-based transfers, the completion of the transfer will 
- *     trigger the DMA interrupt. This interrupt cannot be managed with this HAL, but must be managed as any other IRQ.
+ * The DMA supports the following features:
+ *   - Transfers are event-based. With event-based transfers the core can call a wait function to block execution until the transfer is done.
  *   - The DMA supports 2D transfers which allows transfering a 2D tile in one command. Additional information must then be given to specify the width of the tile and the number of bytes between 2 lines of the tile.
- *   - The event or irq sent at the end of the transfer can be either sent to the core which enqueued the transfer or broadcasted to all cluster cores.
- *   - To identify specific transfers, the DMA provides a counter allocator. All transfers enqueued with the same counter are gathered into a group, on which the core can be stalled until the whole group of transfers is finished.
- *   - All transfers are enqueued into a global FIFO which can stall the core enqueueing the transfer in case it is full. The size of the FIFO depends on the chip but is typically 16 commands.
+ *   - The event sent at the end of the transfer is broadcasted to all cluster cores.
+ *   - To identify specific transfers, the DMA provides a transfer identifier.
+ *   - Multiple transfers can be launched simultaneously, with them being executed 2-4 in parallel, with more waiting in a queue.
  */
 /**@{*/
 
@@ -119,7 +118,7 @@ static inline void plp_dma_barrier();
 /** DMA wait.
   * This blocks the core until the specified transfer is finished. 
   *
-  \param   counter  The counter ID identifying the transfer. This has either been allocated explicitly or returned from an enqueued transfer (e.g. plp_dma_extToL1_2d_irq)
+  \param   counter  The counter ID identifying the transfer. This has been returned from an enqueued transfer (e.g. plp_dma_extToL1_2d)
  */
 static inline void plp_dma_wait(unsigned int dma_tx_id);
 
@@ -141,6 +140,7 @@ static inline void plp_dma_wait(unsigned int dma_tx_id);
   \param  serialize  if set, the DMA will only send AX belonging to a given Arbitrary 1D burst request
                      at a time. This is default behavior to prevent deadlocks. Setting `serialize` to
                      zero violates the AXI4+ATOP specification.
+  \param  twod       if set, the DMA will execute a 2D transfer.
   \return            The generated configuration
   */
 static inline unsigned int pulp_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod);
@@ -171,8 +171,8 @@ static inline unsigned int pulp_idma_memcpy(unsigned int const dst_addr, unsigne
   \param  dst_addr   The destination address
   \param  src_addr   The source address
   \param  num_bytes  The number bytes (per stride)
-  \param  src_stride The stride at the source
   \param  dst_stride The stride at the destination
+  \param  src_stride The stride at the source
   \param  num_reps   The number of repetitions
   \return            The dma transfer identifier
   */
@@ -193,9 +193,13 @@ static inline unsigned int pulp_idma_memcpy_2d(unsigned int const dst_addr, unsi
   \param  serialize  if set, the DMA will only send AX belonging to a given Arbitrary 1D burst request
                      at a time. This is default behavior to prevent deadlocks. Setting `serialize` to
                      zero violates the AXI4+ATOP specification.
+  \param  twod       if set, the DMA will execute a 2D transfer
+  \param  dst_stride if 2D, the stride at the destination
+  \param  src_stride if 2D, the stride at the source
+  \param  num_reps   if 2D, the number of repetitions
   \return            The dma trasfer identifier
   */
-static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize);
+static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps);
 
 /** Return the DMA status.
  * 
@@ -302,6 +306,7 @@ static inline unsigned int pulp_idma_memcpy_2d(unsigned int const dst_addr, unsi
 }
 
 static inline unsigned int pulp_cl_idma_memcpy_2d(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps) {
+#ifdef ARCHI_HAS_DMA_DEMUX
   DMA_WRITE_DEMUX(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
   DMA_WRITE_DEMUX(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
   DMA_WRITE_DEMUX(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
@@ -315,6 +320,9 @@ static inline unsigned int pulp_cl_idma_memcpy_2d(unsigned int const dst_addr, u
   unsigned int dma_tx_id = DMA_READ_DEMUX(PULPOPEN_IDMA_NEXT_ID_REG_OFFSET);
 
   return dma_tx_id;
+#else // ARCHI_HAS_DMA_DEMUX
+  return pulp_idma_memcpy_2d(dst_addr, src_addr, num_bytes, dst_stride, src_stride, num_reps);
+#endif // ARCHI_HAS_DMA_DEMUX
 }
 
 static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps) {
@@ -355,7 +363,7 @@ static inline unsigned int pulp_cl_idma_memcpy_advanced(unsigned int const dst_a
 
   return dma_tx_id;
 #else // ARCHI_HAS_DMA_DEMUX
-  return pulp_idma_memcpy_advanced(dst_addr, src_addr, num_bytes, decouple, deburst, serialize);
+  return pulp_idma_memcpy_advanced(dst_addr, src_addr, num_bytes, decouple, deburst, serialize, twod, dst_stride, src_stride, num_reps);
 #endif // ARCHI_HAS_DMA_DEMUX
 }
 
