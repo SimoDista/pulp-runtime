@@ -149,7 +149,7 @@ static inline void plp_dma_wait(unsigned int dma_tx_id);
                      zero violates the AXI4+ATOP specification.
   \return            The generated configuration
   */
-static inline unsigned int pulp_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize);
+static inline unsigned int pulp_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod);
 
 /**
  * iDMA transfer status
@@ -231,20 +231,21 @@ static inline unsigned int plp_dma_status();
 #define DMA_READ(offset) pulp_read32(ARCHI_IDMA_EXT_ADDR + (offset))
 #endif
 
-static inline unsigned int pulp_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize) {
+static inline unsigned int pulp_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod) {
   unsigned int conf;
 #if defined(__riscv__)
   conf = __builtin_bitinsert(0,    decouple,  1, PULPOPEN_IDMA_CONF_DECOUPLE_BIT);
   conf = __builtin_bitinsert(conf, deburst,   1, PULPOPEN_IDMA_CONF_DEBURST_BIT);
   conf = __builtin_bitinsert(conf, serialize, 1, PULPOPEN_IDMA_CONF_SERIALIZE_BIT);
+  conf = __builtin_bitinsert(conf, twod,      1, PULPOPEN_IDMA_CONF_TWOD_BIT);
 #else
-  conf = (((decouple & 0x1)<<PULPOPEN_IDMA_CONF_DECOUPLE_BIT) | ((deburst & 0x1)<<PULPOPEN_IDMA_CONF_DEBURST_BIT) | ((serialize & 0x1)<<PULPOPEN_IDMA_CONF_SERIALIZE_BIT));
+  conf = (((decouple & 0x1)<<PULPOPEN_IDMA_CONF_DECOUPLE_BIT) | ((deburst & 0x1)<<PULPOPEN_IDMA_CONF_DEBURST_BIT) | ((serialize & 0x1)<<PULPOPEN_IDMA_CONF_SERIALIZE_BIT) | ((twod & 0x1)<<PULPOPEN_IDMA_CONF_TWOD_BIT));
 #endif
   return conf;
 }
 
-static inline unsigned int pulp_cl_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize) {
-  return pulp_idma_get_conf(decouple, deburst, serialize);
+static inline unsigned int pulp_cl_idma_get_conf(unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod) {
+  return pulp_idma_get_conf(decouple, deburst, serialize, twod);
 }
 
 static inline unsigned int pulp_idma_tx_cplt(unsigned int dma_tx_id) {
@@ -306,12 +307,17 @@ static inline unsigned int pulp_idma_memcpy_2d(unsigned int const dst_addr, unsi
   return dma_tx_id;
 }
 
-static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize) {
+static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps) {
   DMA_WRITE(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
   DMA_WRITE(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
   DMA_WRITE(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
-  unsigned int conf = pulp_idma_get_conf(decouple, deburst, serialize);
+  unsigned int conf = pulp_idma_get_conf(decouple, deburst, serialize, twod);
   DMA_WRITE(conf, PULPOPEN_IDMA_CONF_REG_OFFSET);
+  if (twod) {
+    DMA_WRITE(src_stride, PULPOPEN_IDMA_STRIDE_SRC_REG_OFFSET);
+    DMA_WRITE(dst_stride, PULPOPEN_IDMA_STRIDE_DST_REG_OFFSET);
+    DMA_WRITE(num_reps, PULPOPEN_IDMA_NUM_REPETITIONS_REG_OFFSET);
+  }
   asm volatile("" : : : "memory");
 
   // Launch TX
@@ -320,13 +326,18 @@ static inline unsigned int pulp_idma_memcpy_advanced(unsigned int const dst_addr
   return dma_tx_id;
 }
 
-static inline unsigned int pulp_cl_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize) {
+static inline unsigned int pulp_cl_idma_memcpy_advanced(unsigned int const dst_addr, unsigned int const src_addr, unsigned int num_bytes, unsigned int decouple, unsigned int deburst, unsigned int serialize, unsigned int twod, unsigned int dst_stride, unsigned int src_stride, unsigned int num_reps) {
 #ifdef ARCHI_HAS_DMA_DEMUX
   DMA_WRITE_DEMUX(src_addr, PULPOPEN_IDMA_SRC_ADDR_REG_OFFSET);
   DMA_WRITE_DEMUX(dst_addr, PULPOPEN_IDMA_DST_ADDR_REG_OFFSET);
   DMA_WRITE_DEMUX(num_bytes, PULPOPEN_IDMA_NUM_BYTES_REG_OFFSET);
-  unsigned int conf = pulp_cl_idma_get_conf(decouple, deburst, serialize);
+  unsigned int conf = pulp_cl_idma_get_conf(decouple, deburst, serialize, twod);
   DMA_WRITE_DEMUX(conf, PULPOPEN_IDMA_CONF_REG_OFFSET);
+  if (twod) {
+    DMA_WRITE_DEMUX(src_stride, PULPOPEN_IDMA_STRIDE_SRC_REG_OFFSET);
+    DMA_WRITE_DEMUX(dst_stride, PULPOPEN_IDMA_STRIDE_DST_REG_OFFSET);
+    DMA_WRITE_DEMUX(num_reps, PULPOPEN_IDMA_NUM_REPETITIONS_REG_OFFSET);
+  }
   asm volatile("" : : : "memory");
 
   // Launch TX
